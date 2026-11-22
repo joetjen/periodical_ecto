@@ -2,7 +2,7 @@ defmodule PeriodicalEcto.MixProject do
   @moduledoc false
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.1.1"
   @source_url "https://github.com/joetjen/periodical_ecto"
 
   @spec project() :: keyword()
