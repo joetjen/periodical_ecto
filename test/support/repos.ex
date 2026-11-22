@@ -8,6 +8,18 @@ defmodule PeriodicalEctoTest.MyRepo do
   use Ecto.Repo, otp_app: :periodical_ecto, adapter: Ecto.Adapters.MyXQL
 end
 
+defmodule PeriodicalEctoTest.PgDynamicRepo do
+  @moduledoc false
+  # Only ever started without a registered name, selected with put_dynamic_repo/1.
+  use Ecto.Repo, otp_app: :periodical_ecto, adapter: Ecto.Adapters.Postgres
+end
+
+defmodule PeriodicalEctoTest.MyDynamicRepo do
+  @moduledoc false
+  # Only ever started without a registered name, selected with put_dynamic_repo/1.
+  use Ecto.Repo, otp_app: :periodical_ecto, adapter: Ecto.Adapters.MyXQL
+end
+
 defmodule PeriodicalEctoTest.ClaimsMigration do
   @moduledoc false
   use Ecto.Migration
@@ -22,7 +34,7 @@ defmodule PeriodicalEctoTest.Repos do
   # The databases the suite runs against: this package's docker-compose.yml
   # services unless the environment names others.
 
-  alias PeriodicalEctoTest.{MyRepo, PgRepo}
+  alias PeriodicalEctoTest.{MyDynamicRepo, MyRepo, PgDynamicRepo, PgRepo}
 
   @doc false
   @spec all() :: [{String.t(), module(), String.t()}]
@@ -36,6 +48,13 @@ defmodule PeriodicalEctoTest.Repos do
       {"mariadb", MyRepo,
        System.get_env("PERIODICAL_ECTO_MYSQL_URL", "ecto://periodical:periodical@localhost:3316/periodical_ecto_test")}
     ]
+  end
+
+  @doc "Pairs each database with a repository that is only started without a name."
+  @spec dynamic() :: [{String.t(), module(), String.t()}]
+  def dynamic do
+    dynamic_repos = %{"postgres" => PgDynamicRepo, "mariadb" => MyDynamicRepo}
+    for {label, _repo, url} <- all(), do: {label, Map.fetch!(dynamic_repos, label), url}
   end
 
   @doc "Starts a repository, unlinked so it outlives the calling process."

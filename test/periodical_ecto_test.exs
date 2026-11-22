@@ -106,6 +106,36 @@ defmodule PeriodicalEctoTest do
     end
   end
 
+  for {label, repo, url} <- Repos.dynamic() do
+    describe "#{label}, repository without a registered name" do
+      @repo repo
+      @url url
+
+      setup do
+        pool = start_supervised!({@repo, name: nil, url: @url, pool_size: 2, log: false})
+        {:ok, pool: pool}
+      end
+
+      test "claim, renew, and prune run through the dynamic repo", %{pool: pool} do
+        options = [repo: @repo]
+        @repo.put_dynamic_repo(pool)
+        Ecto.Adapters.SQL.query!(pool, "DELETE FROM periodical_claims", [])
+
+        mine = claim(:dynamic, 10_000)
+        assert :won = PeriodicalEcto.claim(mine, options)
+        assert :lost = PeriodicalEcto.claim(claim(:dynamic, 10_000), options)
+        assert :ok = PeriodicalEcto.renew(%{mine | ttl_ms: 50}, options)
+        Process.sleep(80)
+        assert {:ok, 1} = PeriodicalEcto.prune(options)
+        assert %{rows: [[0]]} = Ecto.Adapters.SQL.query!(pool, "SELECT COUNT(*) FROM periodical_claims", [])
+      end
+
+      test "without a dynamic repo the unnamed repository is an error, not a crash" do
+        assert {:error, _reason} = PeriodicalEcto.claim(claim(:dynamic, 10_000), repo: @repo)
+      end
+    end
+  end
+
   test "the migration honours a custom table name" do
     repo = PeriodicalEctoTest.PgRepo
     Ecto.Adapters.SQL.query!(repo, "DROP TABLE IF EXISTS custom_claims", [])

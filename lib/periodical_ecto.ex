@@ -37,6 +37,13 @@ defmodule PeriodicalEcto do
   coordinated occurrence. A database that is unreachable makes claims fail
   with an error, which Periodical's `:coordinator_error` policy handles.
 
+  Statements run through the repository's dynamic repo in the calling process
+  (`c:Ecto.Repo.get_dynamic_repo/0`), so a repository started without a
+  registered name works once `c:Ecto.Repo.put_dynamic_repo/1` is set. Periodical
+  calls `claim/2` in the callback task and `renew/2` in a separate renewal
+  process, so set the dynamic repo inside your own coordinator, around the
+  call to `claim/2` and `renew/2`, not in the process that registers schedules.
+
   ## How a claim decides
 
   PostgreSQL decides in one statement: an `INSERT … ON CONFLICT (key) DO
@@ -237,10 +244,13 @@ defmodule PeriodicalEcto do
   defp quote_table(:mysql, nil, table), do: "`#{table}`"
   defp quote_table(:mysql, prefix, table), do: "`#{prefix}`.`#{table}`"
 
-  # Runs one statement, converting a raised database error into an error tuple.
+  # Runs one statement through the calling process's dynamic repo (the
+  # repository's own name unless put_dynamic_repo/1 was used), converting a
+  # raised database error into an error tuple. Passing the module itself would
+  # look up its registered name and miss a repository started without one.
   @spec query(module(), String.t(), list()) :: {:ok, map()} | {:error, term()}
   defp query(repo, sql, params) do
-    Ecto.Adapters.SQL.query(repo, sql, params, log: false)
+    Ecto.Adapters.SQL.query(repo.get_dynamic_repo(), sql, params, log: false)
   rescue
     exception -> {:error, exception}
   catch
